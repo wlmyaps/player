@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini Player Pro v7</title>
+  <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsmediatags@3.9.7/dist/jsmediatags.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/hover.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0b10; --panel: rgba(18,20,26,0.7); --glass: rgba(255,255,255,0.06);
+      --accent: #00e5ff; --accent-glow: rgba(0,229,255,0.3); --text: #e8e9ed;
+      --dim: #8b92a5; --track: #2a2d38; --btn: #252830; --btn-hover: #353842;
+      --rec-red: #ff3b30;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; font-family:'Segoe UI',system-ui,sans-serif; }
+    body { background:var(--bg); color:var(--text); display:flex; justify-content:center; align-items:center; min-height:100vh; padding:10px; }
+    .player-box { 
+      width:420px; max-width:100%; background:var(--panel); backdrop-filter:blur(12px);
+      border-radius:18px; padding:18px; box-shadow:0 10px 35px rgba(0,0,0,0.7); border:1px solid var(--glass); user-select:none;
+    }
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--glass); }
+    .clock { font-size:1.3rem; font-weight:700; color:var(--accent); font-family:'Courier New',monospace; }
+    .weather { font-size:0.7rem; color:#a5d6a7; }
+    .meta { text-align:center; margin-bottom:8px; height:36px; }
+    .track-title { font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .track-artist { font-size:0.7rem; color:var(--dim); }
+    #videoPlayer { width:100%; max-height:140px; border-radius:8px; background:#000; margin-bottom:6px; display:none; object-fit:contain; }
+    #videoPlayer.active { display:block; }
+    #waveform { width:100%; height:65px; background:rgba(0,0,0,0.25); border-radius:6px; margin-bottom:8px; overflow:hidden; }
+    .controls { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+    .controls button { flex:1; padding:7px; border:none; background:var(--btn); color:var(--text); border-radius:6px; cursor:pointer; font-size:0.95rem; transition:0.2s; }
+    .controls button:hover { background:var(--btn-hover); transform:translateY(-1px); }
+    .time-display { flex:2; text-align:right; font-family:monospace; font-size:0.75rem; color:var(--accent); }
+    .row { display:flex; gap:8px; margin-bottom:8px; }
+    .knob { flex:1; display:flex; flex-direction:column; gap:3px; }
+    .knob label { font-size:0.65rem; color:var(--dim); display:flex; justify-content:space-between; }
+    .knob input[type=range] { width:100%; height:4px; background:var(--track); border-radius:2px; appearance:none; cursor:pointer; }
+    .knob input[type=range]::-webkit-slider-thumb { appearance:none; width:10px; height:10px; background:var(--accent); border-radius:50%; box-shadow:0 0 5px var(--accent-glow); }
+    select, .btn-sm { width:100%; background:var(--btn); color:var(--text); border:1px solid var(--track); padding:4px 6px; border-radius:5px; font-size:0.75rem; cursor:pointer; }
+    .speed-wrap { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+    .eq-section { margin-top:8px; padding-top:6px; border-top:1px solid var(--glass); }
+    .eq-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+    .eq-sliders { display:flex; gap:2px; justify-content:space-between; overflow-x:auto; padding-bottom:4px; }
+    .eq-slider { display:flex; flex-direction:column; align-items:center; flex:1; min-width:22px; }
+    .slider-wrap { height:55px; display:flex; align-items:center; width:100%; }
+    .slider-wrap input { appearance:none; width:100%; height:4px; background:var(--track); border-radius:2px; outline:none; transform:rotate(-90deg); cursor:pointer; }
+    .slider-wrap input::-webkit-slider-thumb { appearance:none; width:8px; height:8px; background:var(--accent); border-radius:50%; }
+    .eq-slider label { font-size:0.5rem; color:var(--dim); margin-top:2px; }
+    .rec-section { display:flex; gap:6px; margin-top:8px; padding-top:6px; border-top:1px solid var(--glass); }
+    .rec-section button { flex:1; padding:6px; border:none; border-radius:5px; cursor:pointer; font-size:0.75rem; background:var(--btn); color:var(--text); transition:0.2s; }
+    #recBtn.recording { background:var(--rec-red); color:#fff; animation:pulse 1.5s infinite; }
+    #saveRecBtn:disabled { opacity:0.5; cursor:not-allowed; }
+    .playlist-box { background:#111318; border-radius:8px; padding:6px; max-height:80px; overflow-y:auto; margin:8px 0; border:1px solid var(--track); font-size:0.75rem; }
+    .playlist-box li { padding:4px 6px; cursor:pointer; border-radius:4px; margin-bottom:2px; display:flex; justify-content:space-between; }
+    .playlist-box li:hover { background:var(--btn); }
+    .playlist-box li.active { background:#003340; color:var(--accent); border-left:3px solid var(--accent); }
+    .add-btn { display:block; width:100%; padding:7px; background:var(--btn); border:1px dashed var(--track); border-radius:6px; color:var(--dim); cursor:pointer; text-align:center; font-size:0.75rem; margin-top:6px; transition:0.2s; }
+    .add-btn:hover { background:var(--btn-hover); color:var(--text); border-color:var(--accent); }
+    .file-input { display:none; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  </style>
+</head>
+<body>
+<div class="player-box">
+  <div class="header">
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="weather" id="weather">??? Cuaca: ?</div>
+  </div>
+  <div class="meta">
+    <div class="track-title" id="trackTitle">Tidak Ada File Diputar</div>
+    <div class="track-artist" id="trackArtist">Pilih file atau radio streaming</div>
+  </div>
+  <video id="videoPlayer" controls playsinline></video>
+  <div id="waveform"></div>
+  <div class="controls">
+    <button id="prevBtn">??</button>
+    <button id="playBtn">??</button>
+    <button id="stopBtn">??</button>
+    <button id="nextBtn">??</button>
+    <span class="time-display" id="timeDisplay">00:00</span>
+  </div>
+  <div class="row">
+    <div class="knob"><label>Volume <span id="volVal">80%</span></label><input type="range" id="volSlider" min="0" max="100" value="80"></div>
+    <div class="knob"><label>Balance L-R <span id="panVal">C</span></label><input type="range" id="panSlider" min="-1" max="1" step="0.1" value="0"></div>
+  </div>
+  <div class="speed-wrap">
+    <span style="font-size:0.75rem;color:var(--dim)">? Speed:</span>
+    <select id="speedSelect">
+      <option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="0.75">0.75x</option>
+      <option value="1" selected>1.0x (Normal)</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option>
+      <option value="1.75">1.75x</option><option value="2">2.0x</option><option value="3">3.0x</option><option value="4">4.0x</option>
+    </select>
+  </div>
+  <div class="row">
+    <div style="flex:1"><select id="radioSelector"><option value="">?? Pilih Radio...</option>
+      <option value="https://22393.live.streamtheworld.com/LOVE972FMAAC.aac?dist=radiosingapore">Love 972 FM</option>
+      <option value="https://22903.live.streamtheworld.com/YES933_PREM.aac?dist=radiosingapore">YES 933 FM</option>
+      <option value="https://22393.live.streamtheworld.com/GOLD905AAC.aac?dist=radiosingapore">Gold 905 FM</option>
+      <option value="https://28373.live.streamtheworld.com/OLI968FM_PREM.aac?dist=radiosingapore">Oli 968 FM</option>
+      <option value="https://28323.live.streamtheworld.com/CLASS95AAC_SC">Class 95 FM</option>
+      <option value="https://22893.live.streamtheworld.com/987FMAAC.aac?dist=radiosingapore">987 FM</option>
+      <option value="https://stream.zeno.fm/s84858548">LoFi Hip Hop</option>
+      <option value="https://stream.zeno.fm/0r0xa792kwzuv">Jazz Radio</option>
+    </select></div>
+    <button class="btn-sm" onclick="clearPlaylist()" style="flex:0.5">??? Clear</button>
+  </div>
+  <ul class="playlist-box" id="playlist">Playlist kosong</ul>
+  <div class="eq-section">
+    <div class="eq-header"><span style="font-size:0.75rem;color:var(--dim)">Graphic EQ</span>
+      <select id="eqPreset"><option value="Flat">Flat</option><option value="Full Bass">Full Bass</option><option value="Clear Vocal">Vocal</option><option value="Treble Boost">Treble</option><option value="Rock">Rock</option><option value="Electronic">Electronic</option></select>
+    </div>
+    <div class="eq-sliders" id="eqSliders"></div>
+  </div>
+  <div class="rec-section">
+    <button id="recBtn">?? Record (Noise Gate)</button>
+    <button id="saveRecBtn" disabled>?? Save MP3</button>
+  </div>
+  <label class="add-btn" for="fileInput">? Open Files (MP3/WAV/OGG/FLAC/MP4...)</label>
+  <input type="file" id="fileInput" class="file-input" multiple accept="audio/*,video/*,.mp3,.wav,.ogg,.aac,.m4a,.mp4,.mov,.webm,.flac,.opus">
+</div>
+
+<script>
+  const eqFreqs=[31,62,125,250,500,1000,2000,4000,8000,16000];
+  const presets={"Flat":[0,0,0,0,0,0,0,0,0,0],"Full Bass":[8,7,6,5,4,2,0,-2,-4,-5],"Clear Vocal":[-2,-1,0,2,4,5,3,1,0,-1],"Treble Boost":[-3,-2,-1,0,2,4,6,7,8,9],"Rock":[5,4,3,2,1,2,4,5,6,5],"Electronic":[7,5,3,1,0,1,3,5,6,7]};
+  let audioCtx=null, sourceNode=null, gainNode=null, panNode=null, compressorNode=null, filters=[];
+  let currentEQGains=new Array(eqFreqs.length).fill(0), isPlaying=false, playlist=[], currentIndex=-1, currentObjectURL=null;
+  const media=document.getElementById('videoPlayer'), playBtn=document.getElementById('playBtn'), prevBtn=document.getElementById('prevBtn'), nextBtn=document.getElementById('nextBtn'), stopBtn=document.getElementById('stopBtn'), timeDisplay=document.getElementById('timeDisplay'), trackTitle=document.getElementById('trackTitle'), trackArtist=document.getElementById('trackArtist'), radioSelector=document.getElementById('radioSelector'), volSlider=document.getElementById('volSlider'), volVal=document.getElementById('volVal'), panSlider=document.getElementById('panSlider'), panVal=document.getElementById('panVal'), speedSelect=document.getElementById('speedSelect');
+  
+  let wavesurfer=WaveSurfer.create({container:'#waveform',waveColor:'#00e5ff',progressColor:'#005f73',cursorColor:'#ff3b30',backend:'WebAudio',height:65,barWidth:3,barRadius:2,barGap:1,plugins:[WaveSurfer.Hover.create({lineColor:'#fff',lineWidth:1,labelBackground:'#555'})]});
+  wavesurfer.on('play',()=>{isPlaying=true;playBtn.textContent='??'});
+  wavesurfer.on('pause',()=>{isPlaying=false;playBtn.textContent='??'});
+  wavesurfer.on('finish',()=>{if(currentIndex<playlist.length-1){currentIndex++;loadAndPlay()}});
+  wavesurfer.on('audioprocess',()=>{const c=wavesurfer.getCurrentTime(),d=wavesurfer.getDuration();timeDisplay.textContent=`${format(c)} / ${isFinite(d)?format(d):'8'}`});
+  function format(s){return isNaN(s)?'00:00':`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`}
+
+  function initAudio(){
+    if(audioCtx)return;
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)({sampleRate:44100});
+    sourceNode=audioCtx.createMediaElementSource(media);
+    compressorNode=audioCtx.createDynamicsCompressor();
+    compressorNode.threshold.value=-24;compressorNode.knee.value=30;compressorNode.ratio.value=12;compressorNode.attack.value=0.003;compressorNode.release.value=0.25;
+    panNode=audioCtx.createStereoPanner();gainNode=audioCtx.createGain();gainNode.gain.value=0.8;
+    let prev=sourceNode;
+    eqFreqs.forEach((f,i)=>{const fil=audioCtx.createBiquadFilter();fil.type='peaking';fil.frequency.value=f;fil.Q.value=1.0;fil.gain.value=currentEQGains[i];filters.push(fil);prev.connect(fil);prev=fil});
+    prev.connect(compressorNode);compressorNode.connect(panNode);panNode.connect(gainNode);gainNode.connect(audioCtx.destination);
+    wavesurfer.backend.setMediaElementSource(sourceNode);
+    if(audioCtx.state==='suspended')audioCtx.resume();
+  }
+
+  async function loadAndPlay(){
+    if(currentIndex<0||currentIndex>=playlist.length)return;
+    if(currentObjectURL)URL.revokeObjectURL(currentObjectURL);
+    const item=playlist[currentIndex];currentObjectURL=URL.createObjectURL(item.file);
+    media.src=currentObjectURL;media.load();
+    media.classList.toggle('active',item.file.type.startsWith('video/'));
+    trackTitle.textContent=item.name;trackArtist.textContent='Memuat metadata...';
+    wavesurfer.load(currentObjectURL);readMetadata(item.file);initAudio();
+    await wavesurfer.play();
+  }
+
+  function playRadio(url){media.src=url;media.load();media.classList.remove('active');trackTitle.textContent='Radio Stream';trackArtist.textContent='Online';media.crossOrigin="anonymous";initAudio();media.play()}
+  function clearPlaylist(){playlist=[];currentIndex=-1;if(currentObjectURL)URL.revokeObjectURL(currentObjectURL);media.src='';media.load();wavesurfer.empty();trackTitle.textContent='Playlist Dikosongkan';trackArtist.textContent='';updatePlaylistUI()}
+
+  function readMetadata(file){if(!file||!jsmediatags){trackArtist.textContent='Unknown Artist';return}jsmediatags.read(file,{onSuccess:(t)=>{const tag=t.tags;if(tag.title)trackTitle.textContent=tag.title;if(tag.artist)trackArtist.textContent=`${tag.artist}${tag.album?' • '+tag.album:''}`;else trackArtist.textContent=tag.album||'Unknown Artist'},onError:()=>{trackArtist.textContent='No Metadata'}})}
+
+  const eqContainer=document.getElementById('eqSliders');eqContainer.innerHTML='';
+  eqFreqs.forEach((f,i)=>{const w=document.createElement('div');w.className='eq-slider';w.innerHTML=`<div class="slider-wrap"><input type="range" min="-12" max="12" value="0" step="0.5"></div><label>${f>=1000?f/1000+'k':f}</label>`;const inp=w.querySelector('input');inp.oninput=()=>{const v=Math.round(inp.value*2)/2;if(filters[i])filters[i].gain.value=v;currentEQGains[i]=v};eqContainer.appendChild(w)});
+  document.getElementById('eqPreset').onchange=(e)=>{const g=presets[e.target.value]||presets.Flat;const inputs=eqContainer.querySelectorAll('input');g.forEach((v,i)=>{inputs[i].value=v;currentEQGains[i]=v;if(filters[i])filters[i].gain.value=v})};
+  volSlider.oninput=()=>{const v=volSlider.value;volVal.textContent=v+'%';if(gainNode)gainNode.gain.value=v/100};
+  panSlider.oninput=()=>{const v=parseFloat(panSlider.value);panVal.textContent=v===0?'C':v<0?'L':'R';if(panNode)panNode.pan.value=v};
+  speedSelect.onchange=()=>{media.playbackRate=parseFloat(speedSelect.value)};
+
+  playBtn.onclick=()=>{initAudio();if(!media.src&&playlist.length){currentIndex=0;loadAndPlay();return}wavesurfer.playPause()};
+  stopBtn.onclick=()=>{media.pause();wavesurfer.stop();isPlaying=false;playBtn.textContent='??'};
+  prevBtn.onclick=()=>{initAudio();if(currentIndex>0){currentIndex--;loadAndPlay()}};
+  nextBtn.onclick=()=>{initAudio();if(currentIndex<playlist.length-1){currentIndex++;loadAndPlay()}};
+  radioSelector.onchange=(e)=>{if(e.target.value)playRadio(e.target.value)};
+  document.getElementById('fileInput').onchange=(e)=>{Array.from(e.target.files).forEach(f=>playlist.push({file:f,name:f.name}));if(currentIndex===-1){currentIndex=0;loadAndPlay()}e.target.value=''};
+  document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='SELECT'){e.preventDefault();playBtn.click()}if(e.code==='ArrowLeft')prevBtn.click();if(e.code==='ArrowRight')nextBtn.click()});
+
+  let mediaStream=null,recording=false,audioChunks=[],mp3Blob=null;
+  const recBtn=document.getElementById('recBtn'),saveRecBtn=document.getElementById('saveRecBtn');
+  recBtn.onclick=async()=>{if(recBtn.classList.contains('recording')){recording=false;mediaStream.getTracks().forEach(t=>t.stop());recBtn.classList.remove('recording');recBtn.textContent='?? Record (Noise Gate)';const totalLen=audioChunks.reduce((a,c)=>a+c.length,0);const result=new Float32Array(totalLen);let off=0;for(let c of audioChunks){result.set(c,off);off+=c.length}audioChunks=[];const mp3enc=new lamejs.Mp3Encoder(1,44100,128);const samples=new Int16Array(result.length);for(let i=0;i<result.length;i++)samples[i]=Math.max(-1,Math.min(1,result[i]))*0x7FFF;const mp3Data=[];for(let i=0;i<samples.length;i+=1152)mp3Data.push(mp3enc.encodeBuffer(samples.subarray(i,i+1152)));mp3Data.push(mp3enc.flush());mp3Blob=new Blob(mp3Data,{type:'audio/mp3'});saveRecBtn.disabled=false;saveRecBtn.textContent='?? Save MP3';return}try{mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});const ctx=new AudioContext({sampleRate:44100});const src=ctx.createMediaStreamSource(mediaStream);const proc=ctx.createScriptProcessor(2048,1,1);src.connect(proc);proc.connect(ctx.destination);audioChunks=[];recording=true;recBtn.classList.add('recording');recBtn.textContent='?? Stop Rec';proc.onaudioprocess=(e)=>{if(!recording)return;const d=e.inputBuffer.getChannelData(0);let rms=0;for(let i=0;i<d.length;i++)rms+=d[i]**2;rms=Math.sqrt(rms/d.length);if(rms>0.005)audioChunks.push(new Float32Array(d))}}catch(err){alert("Mic Error: "+err.message)}};
+  saveRecBtn.onclick=()=>{if(!mp3Blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(mp3Blob);a.download=`rec_${Date.now()}.mp3`;a.click();saveRecBtn.disabled=true;saveRecBtn.textContent='?? Saved!'};
+  setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID',{hour12:false})},1000);
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=3.5952&longitude=98.6722&current_weather=true&timezone=Asia/Jakarta').then(r=>r.json()).then(d=>{document.getElementById('weather').textContent=`??? ${d.current_weather.temperature}°C`});
+</script>
+</body>
+</html>
