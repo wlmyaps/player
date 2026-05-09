@@ -1,6 +1,6 @@
 | **[Aspek](ca://s?q=Perbandingan_aspek_player)** | **[playermini45](ca://s?q=Detail_playermini45)** | **[playermini46](ca://s?q=Detail_playermini46)** |
 | --- | --- | --- |
-| **[Tujuan rilis](ca://s?q=Tujuan_rilis_playermini)** | Versi awal arsip streaming global Suaka Cahaya. Fokus pada stabilitas dasar dan integrasi m3u8. | Versi penyempurnaan dengan perbaikan buffer dan layout streaming. |
+| **[Tujuan rilis](ca://s?q=Tujuan_rilis_playermini)** | Versi awal arsip streaming global Cahaya. Fokus pada stabilitas dasar dan integrasi m3u8. | Versi penyempurnaan dengan perbaikan buffer dan layout streaming. |
 | **[Struktur HTML](ca://s?q=Struktur_HTML_player)** | Masih sederhana, belum ada pembagian kontainer visual. | Ditambah ``iframeContainer`` dan ``div`` wrapper agar tampilan lebih rapi dan responsif. |
 | **[Audio engine](ca://s?q=Audio_engine_player)** | Menggunakan gain standar tanpa efek tambahan. | Mulai ditambahkan ``AudioContext`` dengan ``gainNode`` dan ``oscillator`` untuk uji sound blaster. |
 | **[Streaming link](ca://s?q=Streaming_link_player)** | Beberapa link belum aktif (belum ada streaming). | Link diperbarui, sebagian sudah aktif dan diuji koneksi. |
