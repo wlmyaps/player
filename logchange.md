@@ -27,4 +27,6 @@ Versi 50 → perbaikan algoritma boosting suara + database update besar.
 
 Versi 09052026‑1533 → update harian, fokus pada stabilitas, layout HTML, dan pencarian lebih ringan.
 
+Versi 51 → menggunakan Algortma BiqualFilterNode dari Web Audio API untuk memfilter frequensi secara real-time berdasarkan slider yang digeser user, menambahkan algorima encoding Audio Recording.
+
 🌸 Dengan log ini, keluarga bisa langsung tahu apa yang berubah setiap versi tanpa harus menebak‑nebak.
