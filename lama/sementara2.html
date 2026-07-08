@@ -675,50 +675,41 @@ function compressHTML() {
     editor.setValue(code); runPreview(); alert("HTML berhasil di-compress!"); toggleSidebar();
 }
 
-// ===================== EXPORT / PRINT (FALLBACK SUPER ROBUST) =====================
+// ===================== EXPORT / PRINT (FIX FINAL - PDF TIDAK KOSONG) =====================
 function exportFile(format) {
     toggleSidebar();
 
     // Cek apakah library berhasil dimuat
     const libraryGagal = (typeof html2pdf === 'undefined' || typeof html2canvas === 'undefined');
 
-    // --- FALLBACK TANPA LIBRARY (karena file:///) ---
+    // --- FALLBACK TANPA LIBRARY ---
     if (libraryGagal) {
-        
-        // 1. KALAU USER PILIH JPG ATAU PNG
         if (format === 'jpg' || format === 'png') {
-            alert('❌ Library html2canvas tidak termuat (karena file lokal).\n\nEkspor ke JPG/PNG tidak bisa dilakukan tanpa library.\n\n🔹 Solusi alternatif:\n1. Buka Editor, lalu screenshot layar (F12 → Capture screenshot).\n2. Ekspor dulu ke PDF, lalu ubah PDF ke JPG/PNG memakai aplikasi luar.');
+            alert('❌ Library html2canvas tidak termuat. Export JPG/PNG tidak bisa. Gunakan PDF, atau jalankan lewat Live Server.');
             return;
         }
 
-        // 2. KALAU USER PILIH PDF (gunakan jendela baru biar tidak kosong)
+        // Fallback ke print browser
         const editorContent = editor.getValue();
         if (!editorContent.trim()) {
-            alert('❌ Editor kosong. Tidak ada konten untuk diprint.');
+            alert('❌ Editor kosong.');
             return;
         }
-
-        // Bungkus konten dalam HTML lengkap agar pas saat diprint
         const htmlPrint = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
             body { font-family: monospace; padding: 20px; background: #fff; color: #000; white-space: pre-wrap; max-width: 800px; margin: auto; }
         </style></head><body>${editorContent.replace(/</g,'&lt;')}</body></html>`;
-
-        // Buka jendela baru, tulis kontennya, lalu print
         const printWindow = window.open('', '_blank', 'width=800,height=600');
         if (!printWindow) {
-            alert('⚠️ Popup diblokir. Izinkan popup di browser untuk fitur Print.');
+            alert('⚠️ Popup diblokir. Izinkan popup di browser.');
             return;
         }
         printWindow.document.write(htmlPrint);
         printWindow.document.close();
-        // Tunggu konten termuat, lalu print otomatis
-        printWindow.onload = () => {
-            printWindow.print();
-        };
+        printWindow.onload = () => { printWindow.print(); };
         return;
     }
 
-    // --- KODE EKSPOR NORMAL (JIKA LIBRARY BERHASIL LOAD) ---
+    // --- KODE EKSPOR NORMAL (library sudah termuat) ---
     let contentHtml = '';
     let isPreviewEmpty = true;
 
@@ -748,22 +739,10 @@ function exportFile(format) {
     container.innerHTML = contentHtml;
     document.body.appendChild(container);
 
+    // Tunggu render 500ms
     setTimeout(() => {
         try {
-            if (format === 'pdf') {
-                html2pdf().set({
-                    margin: 0.5,
-                    filename: 'manako-export.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, logging: false },
-                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                }).from(container).save().then(() => {
-                    document.body.removeChild(container);
-                }).catch(err => {
-                    document.body.removeChild(container);
-                    alert('❌ Gagal export PDF: ' + err.message);
-                });
-            } else if (format === 'jpg' || format === 'png') {
+            if (format === 'jpg' || format === 'png') {
                 html2canvas(container, { scale: 2, useCORS: true, logging: false })
                     .then(canvas => {
                         const link = document.createElement('a');
@@ -771,9 +750,40 @@ function exportFile(format) {
                         link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
                         link.click();
                         document.body.removeChild(container);
-                    }).catch(err => {
+                    })
+                    .catch(err => {
                         document.body.removeChild(container);
                         alert('❌ Gagal export gambar: ' + err.message);
+                    });
+            } 
+            // === BAGIAN INI YANG MEMPERBAIKI PDF KOSONG ===
+            else if (format === 'pdf') {
+                html2canvas(container, { scale: 2, useCORS: true, logging: false })
+                    .then(canvas => {
+                        // Ubah canvas jadi gambar JPEG
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        
+                        // Ambil library jsPDF yang sudah ter-load
+                        const { jsPDF } = window.jspdf;
+                        const pdf = new jsPDF('p', 'mm', 'a4'); // A4 portrait
+                        
+                        // Hitung rasio agar gambar pas di halaman PDF
+                        const imgProps = pdf.getImageProperties(imgData);
+                        const pdfWidth = pdf.internal.pageSize.getWidth();
+                        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                        
+                        // Masukkan gambar ke halaman PDF
+                        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                        
+                        // Download PDF
+                        pdf.save('manako-export.pdf');
+                        
+                        document.body.removeChild(container);
+                    })
+                    .catch(err => {
+                        document.body.removeChild(container);
+                        console.error('Export PDF error:', err);
+                        alert('❌ Gagal export PDF: ' + err.message);
                     });
             }
         } catch (err) {
