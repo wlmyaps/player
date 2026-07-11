@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Manako Editor Pro - Excel Edition (Fix Compare)</title>
+<title>Manako Editor Versi dasar</title>
 
 <!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
@@ -51,6 +51,30 @@ body.light .sub-menu { background: #e9e9e9; }
 .sub-menu .menu-item { padding-left: 40px; font-size: 13px; border-bottom: none; }
 .menu-select { width: 100%; background: #3c3c3c; color: #fff; border: 1px solid #555; padding: 6px; border-radius: 4px; margin-top: 5px; }
 body.light .menu-select { background: #fff; color: #222; border: 1px solid #ccc; }
+
+/* ===== Multi-tab & File Explorer ===== */
+.tab-bar{display:flex;align-items:stretch;background:#252526;border-bottom:1px solid #000;flex-shrink:0;height:34px;}
+body.light .tab-bar{background:#e8e8e8;border-bottom:1px solid #ccc;}
+.tab-list{display:flex;overflow-x:auto;overflow-y:hidden;white-space:nowrap;flex:1;min-width:0;}
+.tab-list::-webkit-scrollbar{height:4px;}
+.tab-list::-webkit-scrollbar-thumb{background:#555;}
+.tab-item{display:flex;align-items:center;gap:7px;padding:0 10px;font-size:12px;color:#999;background:#2d2d2d;border-right:1px solid #000;cursor:pointer;user-select:none;flex-shrink:0;max-width:170px;}
+body.light .tab-item{background:#ddd;color:#555;border-right:1px solid #ccc;}
+.tab-item.active{background:#1e1e1e;color:#fff;box-shadow:inset 0 2px 0 #4fc1ff;}
+body.light .tab-item.active{background:#fff;color:#222;box-shadow:inset 0 2px 0 #007acc;}
+.tab-item .tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tab-item .tab-close{opacity:.55;font-size:14px;padding:1px 4px;border-radius:3px;line-height:1;}
+.tab-item .tab-close:hover{opacity:1;background:#e81123;color:#fff;}
+.tab-add{display:flex;align-items:center;padding:0 14px;cursor:pointer;color:#999;font-size:16px;flex-shrink:0;border-left:1px solid #000;}
+body.light .tab-add{border-left:1px solid #ccc;color:#666;}
+.tab-add:hover{color:#fff;background:#333;}
+body.light .tab-add:hover{color:#000;background:#ddd;}
+.explorer-item{display:flex !important;align-items:center;justify-content:space-between;padding-right:8px !important;}
+.explorer-item span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.explorer-item.active{background:#37373d;color:#4fc1ff;}
+body.light .explorer-item.active{background:#d6ebff;color:#007acc;}
+.explorer-item .tab-close{opacity:.45;font-size:13px;padding:1px 5px;border-radius:3px;}
+.explorer-item .tab-close:hover{opacity:1;color:#fff;background:#e81123;}
 .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: none; }
 .overlay.active { display: block; }
 .main{flex:1;display:flex;overflow:hidden; height: calc(100vh - 70px);}
@@ -60,8 +84,7 @@ body.light .pane h3{background:#eee;color:#555}
 .editor-wrap{flex:1;position:relative}
 .CodeMirror{position:absolute;inset:0;height:100%;font-family:'Cascadia Code',Consolas,monospace;font-size:14px}
 iframe{flex:1;border:none;background:#fff;width:100%}
-.status{background:#007acc;color:#fff;font-size:12px;padding:3px 10px;display:flex;justify-content:space-between; align-items:center; height: 20px;}
-#diff-stats { flex:1; text-align:center; font-weight:bold; font-size:11px; color:#f0f6fc; margin:0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.status{background:#007acc;color:#fff;font-size:12px;padding:3px 10px;display:flex;justify-content:space-between; height: 20px;}
 
 .CodeMirror-dialog {
     position: fixed !important; z-index: 9999 !important; top: 15% !important; left: 50% !important;
@@ -77,16 +100,20 @@ iframe{flex:1;border:none;background:#fff;width:100%}
 
 <div class="navbar">
     <div class="hamburger" onclick="toggleSidebar()">&#9776;</div>
-    <div class="brand">Manako Editor Pro</div>
+    <div class="brand">Manako Editor Versi sederhana</div>
 </div>
 
 <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
 
 <div class="sidebar" id="sidebar">
     <div class="close-btn" onclick="toggleSidebar()">&times;</div>
-    
+
+    <div class="menu-item" style="cursor:default;font-weight:bold;color:#4fc1ff;border-bottom:1px solid #555;">📂 File Terbuka</div>
+    <div id="fileExplorerList"></div>
+
     <div class="menu-item" id="baru">📄 File Baru</div>
     <div class="menu-item" id="buka">📂 Buka File</div>
+    <div class="menu-item" id="bukaMedia">🎬 Buka Media (Video/Audio)</div>
     <div class="menu-item" id="simpan">💾 Simpan File</div>
     
     <div class="menu-item" onclick="toggleSubMenu('saveAsMenu')">💾 Simpan Sebagai &#9662;</div>
@@ -192,21 +219,23 @@ iframe{flex:1;border:none;background:#fff;width:100%}
 <div class="main">
   <div class="pane" style="border-right:1px solid #000">
     <h3>Editor</h3>
+    <div class="tab-bar">
+      <div class="tab-list" id="tabList"></div>
+      <span class="tab-add" id="tabAdd" title="Tab Baru">+</span>
+    </div>
     <div class="editor-wrap"><textarea id="code"></textarea></div>
   </div>
   <div class="pane">
     <h3>Hasil (Live Preview)</h3>
-    <iframe id="preview" sandbox="allow-scripts allow-same-origin"></iframe>
+    <!-- PERBAIKAN BUG EKSPOR MEDIA: tambahkan allow-downloads -->
+    <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-downloads"></iframe>
     <embed id="pdfPreview" type="application/pdf" style="display:none;flex:1;width:100%;height:100%;border:none;background:#525659;">
   </div>
 </div>
 
-<div class="status">
-    <span id="pos">Ln 1, Col 1</span>
-    <span id="diff-stats"></span>
-    <span id="file">untitled.html</span>
-</div>
+<div class="status"><span id="pos">Ln 1, Col 1</span><span id="file">untitled.html</span></div>
 <input type="file" id="fileInput" accept=".html,.htm,.txt,.js,.css,.py,.c,.php,.md,.xlsx,.xls,.csv,.mxl,.gtx,.pdf" hidden>
+<input type="file" id="mediaInput" accept="video/*,audio/*,.mp4,.webm,.mkv,.avi,.mov,.m4v,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.wma" hidden>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
@@ -270,32 +299,263 @@ let dark = true;
 const preview = document.getElementById('preview');
 const pdfPreview = document.getElementById('pdfPreview');
 const fileInput = document.getElementById('fileInput');
+const mediaInput = document.getElementById('mediaInput');
 const STORAGE_KEY = 'manako_editor_pro_v2';
 let currentSpreadsheetData = null;
-let currentMode = 'html';
+let currentMode = 'html'; // 'html','csv','xlsx','mxl','pdf','media','text','md'
 let currentPdfUrl = null;
+let currentMediaUrl = null;
+let mediaInfoDoc = null;
+
+// ===================== MULTI-TAB: state =====================
+let tabs = [];
+let activeTabId = null;
+let tabCounter = 0;
+
+// Helper truncate UTF-8 aman
+function truncateText(text, maxLen) {
+    return [...text].slice(0, maxLen).join('') + (text.length > maxLen ? '…' : '');
+}
 
 function saveToLocal(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ code: editor.getValue(), file: currentFile, mode: editor.getOption('mode'), theme: editor.getOption('theme'), dark: dark, time: Date.now() }));
+    // Jangan simpan jika sedang mode transien (PDF/Media) karena doc editor tidak mewakili tab asli
+    if(currentMode === 'pdf' || currentMode === 'media') return;
+    
+    const t = tabs.find(x => x.id === activeTabId);
+    if(!t) return;
+    t.name = currentFile; t.contentMode = currentMode; t.cmMode = editor.getOption('mode'); t.spreadsheetData = currentSpreadsheetData;
+    try{ t.scrollInfo = editor.getScrollInfo(); }catch(e){}
+    
+    const tabsData = tabs.map(t => ({ name: t.name, code: t.doc.getValue(), cmMode: t.cmMode, contentMode: t.contentMode, spreadsheetData: t.spreadsheetData }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, tabs: tabsData, activeIndex: Math.max(0, tabs.findIndex(t => t.id === activeTabId)), theme: editor.getOption('theme'), dark: dark, time: Date.now() }));
     document.getElementById('file').textContent = currentFile + ' ✓';
     setTimeout(()=>{ document.getElementById('file').textContent = currentFile; }, 1200);
+    renderTabsUI();
   }catch(e){ console.warn('Gagal save local', e); }
 }
 function loadFromLocal(){
   try{
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if(data && data.code){
-      editor.setValue(data.code); currentFile = data.file || 'local.html'; document.getElementById('file').textContent = currentFile;
-      if(data.mode){ editor.setOption('mode', data.mode); document.getElementById('mode').value = data.mode; if(data.mode === 'markdown') currentMode = 'md'; }
-      if(data.dark !== undefined && data.dark !== dark){ dark = data.dark; editor.setOption('theme', dark?'monokai':'eclipse'); document.body.classList.toggle('light', !dark); }
-      if(data.theme){ ensureThemeLoaded(data.theme); editor.setOption('theme', data.theme); const ts = document.getElementById('themeSelect'); if(ts) ts.value = data.theme; }
-      return true;
+    let data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(!data) return false;
+    if(data.code !== undefined && !data.tabs){
+      data = { tabs: [{ name: data.file || 'local.html', code: data.code, cmMode: data.mode || 'htmlmixed', contentMode: (data.mode === 'markdown' ? 'md' : 'html'), spreadsheetData: null }], activeIndex: 0, theme: data.theme, dark: data.dark };
     }
-  }catch(e){}
+    if(!Array.isArray(data.tabs) || data.tabs.length === 0) return false;
+
+    tabs = data.tabs.map(td => ({
+      id: 'tab_' + (++tabCounter), name: td.name || 'untitled.html',
+      doc: new CodeMirror.Doc(td.code || '', td.cmMode || 'htmlmixed'),
+      cmMode: td.cmMode || 'htmlmixed', contentMode: td.contentMode || 'html',
+      spreadsheetData: td.spreadsheetData || null, scrollInfo: null
+    }));
+    const idx = Math.min(Math.max(data.activeIndex || 0, 0), tabs.length - 1);
+    activeTabId = tabs[idx].id;
+    editor.swapDoc(tabs[idx].doc);
+    editor.setOption('mode', tabs[idx].cmMode);
+    currentFile = tabs[idx].name; currentMode = tabs[idx].contentMode; currentSpreadsheetData = tabs[idx].spreadsheetData;
+    document.getElementById('file').textContent = currentFile;
+    document.getElementById('mode').value = tabs[idx].cmMode;
+
+    if(data.dark !== undefined && data.dark !== dark){ dark = data.dark; editor.setOption('theme', dark?'monokai':'eclipse'); document.body.classList.toggle('light', !dark); }
+    if(data.theme){ ensureThemeLoaded(data.theme); editor.setOption('theme', data.theme); const ts = document.getElementById('themeSelect'); if(ts) ts.value = data.theme; }
+    return true;
+  }catch(e){ console.warn('Gagal load local', e); }
   return false;
 }
-if(!loadFromLocal()){ editor.setValue(bootstrapSample); }
+if(!loadFromLocal()){
+  editor.setValue(bootstrapSample);
+  const firstId = 'tab_' + (++tabCounter);
+  tabs.push({ id: firstId, name: currentFile, doc: editor.getDoc(), cmMode: editor.getOption('mode'), contentMode: currentMode, spreadsheetData: null, scrollInfo: null });
+  activeTabId = firstId;
+}
+renderTabsUI();
+
+// ===================== MULTI-TAB: fungsi inti =====================
+function exitTransientPreview(){
+  // Cleanup PDF
+  if(currentMode === 'pdf'){
+    if(currentPdfUrl){ URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
+    pdfPreview.style.display = 'none';
+    pdfPreview.removeAttribute('src');
+  }
+  // Cleanup Media
+  if(currentMode === 'media'){
+    if(currentMediaUrl){ URL.revokeObjectURL(currentMediaUrl); currentMediaUrl = null; }
+    if(mediaInfoDoc){ mediaInfoDoc = null; }
+  }
+  // Reset preview ke iframe biasa
+  resetToIframePreview();
+  editor.setOption('readOnly', false);
+
+  // Jika editor saat ini menggunakan doc transien (media), kembalikan ke doc tab asli
+  const t = tabs.find(x => x.id === activeTabId);
+  if(t && (currentMode === 'media')){
+    if(editor.getDoc() !== t.doc){
+      editor.swapDoc(t.doc);
+      editor.setOption('mode', t.cmMode);
+      const ms = document.getElementById('mode'); if(ms) ms.value = t.cmMode;
+      currentMode = t.contentMode;
+      currentFile = t.name;
+      currentSpreadsheetData = t.spreadsheetData;
+      document.getElementById('file').textContent = currentFile;
+    }
+  }
+}
+
+function syncActiveTabFromGlobals(){
+  // Hanya simpan jika bukan mode transien
+  if(currentMode === 'pdf' || currentMode === 'media') return;
+  const t = tabs.find(x => x.id === activeTabId);
+  if(!t) return;
+  t.name = currentFile; t.contentMode = currentMode; t.cmMode = editor.getOption('mode'); t.spreadsheetData = currentSpreadsheetData;
+  try{ t.scrollInfo = editor.getScrollInfo(); }catch(e){}
+}
+
+function switchToTab(id){
+  if(id === activeTabId && currentMode !== 'pdf' && currentMode !== 'media') return;
+  
+  // Simpan state tab yang sedang aktif sebelum berpindah
+  if(currentMode !== 'pdf' && currentMode !== 'media'){
+     syncActiveTabFromGlobals();
+  }
+  
+  exitTransientPreview();
+  
+  const target = tabs.find(x => x.id === id);
+  if(!target) return;
+  
+  editor.swapDoc(target.doc);
+  editor.setOption('mode', target.cmMode);
+  currentFile = target.name; currentMode = target.contentMode; currentSpreadsheetData = target.spreadsheetData;
+  activeTabId = id;
+  document.getElementById('file').textContent = currentFile;
+  document.getElementById('mode').value = target.cmMode;
+  if(target.scrollInfo){ try{ editor.scrollTo(target.scrollInfo.left, target.scrollInfo.top); }catch(e){} }
+  renderTabsUI();
+  runPreview();
+  editor.focus();
+}
+
+function openNewTab(name, content, cmMode, contentMode){
+  exitTransientPreview();
+  syncActiveTabFromGlobals();
+  const id = 'tab_' + (++tabCounter);
+  const doc = new CodeMirror.Doc(content !== undefined ? content : '', cmMode || 'htmlmixed');
+  const tab = { id, name: name || 'untitled.html', doc, cmMode: cmMode || 'htmlmixed', contentMode: contentMode || 'html', spreadsheetData: null, scrollInfo: null };
+  tabs.push(tab);
+  editor.swapDoc(tab.doc);
+  editor.setOption('mode', tab.cmMode);
+  currentFile = tab.name; currentMode = tab.contentMode; currentSpreadsheetData = null;
+  activeTabId = id;
+  document.getElementById('file').textContent = currentFile;
+  document.getElementById('mode').value = tab.cmMode;
+  renderTabsUI();
+  return tab;
+}
+
+function closeTab(id, evt){
+  if(evt) evt.stopPropagation();
+  const idx = tabs.findIndex(x => x.id === id);
+  if(idx === -1) return;
+  const label = (id === activeTabId) ? currentFile : tabs[idx].name;
+  if(!confirm('Tutup "' + label + '"? Perubahan yang belum di-download akan hilang.')) return;
+  const wasActive = (id === activeTabId);
+  tabs.splice(idx, 1);
+  if(tabs.length === 0){
+    openNewTab('untitled.html', '', 'htmlmixed', 'html');
+    runPreview(); saveToLocal();
+    return;
+  }
+  if(wasActive){
+    activeTabId = null;
+    switchToTab(tabs[Math.min(idx, tabs.length - 1)].id);
+    saveToLocal();
+  } else {
+    renderTabsUI();
+    saveToLocal();
+  }
+}
+
+function renderTabsUI(){
+  const list = document.getElementById('tabList');
+  const explorer = document.getElementById('fileExplorerList');
+  if(!list || !explorer) return;
+  list.innerHTML = ''; explorer.innerHTML = '';
+  tabs.forEach(t=>{
+    const isActive = (t.id === activeTabId);
+    const label = isActive ? currentFile : t.name;
+    const shortLabel = truncateText(label, 18);
+    
+    const clickHandler = () => {
+      if(isActive && (currentMode === 'pdf' || currentMode === 'media')){
+        exitTransientPreview(); // revoke URL dan kembalikan editor
+        const tb = tabs.find(x => x.id === activeTabId);
+        if(tb){ currentFile = tb.name; currentMode = tb.contentMode; currentSpreadsheetData = tb.spreadsheetData; document.getElementById('file').textContent = currentFile; renderTabsUI(); runPreview(); }
+      } else { switchToTab(t.id); }
+    };
+
+    const tabEl = document.createElement('div');
+    tabEl.className = 'tab-item' + (isActive ? ' active' : '');
+    tabEl.title = label;
+    tabEl.onclick = clickHandler;
+    const nameSpan = document.createElement('span'); nameSpan.className = 'tab-label'; nameSpan.textContent = shortLabel;
+    const closeSpan = document.createElement('span'); closeSpan.className = 'tab-close'; closeSpan.textContent = '×';
+    closeSpan.onclick = (ev) => closeTab(t.id, ev);
+    tabEl.appendChild(nameSpan); tabEl.appendChild(closeSpan);
+    list.appendChild(tabEl);
+
+    const expEl = document.createElement('div');
+    expEl.className = 'menu-item explorer-item' + (isActive ? ' active' : '');
+    expEl.onclick = () => { clickHandler(); toggleSidebar(); };
+    const expName = document.createElement('span'); expName.textContent = '📄 ' + shortLabel; expName.title = label;
+    const expClose = document.createElement('span'); expClose.className = 'tab-close'; expClose.textContent = '×';
+    expClose.onclick = (ev) => closeTab(t.id, ev);
+    expEl.appendChild(expName); expEl.appendChild(expClose);
+    explorer.appendChild(expEl);
+  });
+}
+
+// ===================== [FIX FINAL] RACE-SAFE TAB APPLIER =====================
+// Fungsi ini memastikan konten file ditulis ke tab yang BENAR (targetTabId), 
+// meskipun user sudah pindah tab saat file baru saja selesai dibaca.
+function applyLoadedContentToTab(targetTabId, fileName, content, cmMode, contentMode, spreadsheetData, afterApply){
+  const tab = tabs.find(t=>t.id===targetTabId);
+  if(!tab){ return false; } // Tab sudah ditutup, fallback ke cara lama (tulis ke editor aktif)
+  tab.name = fileName;
+  try{ tab.doc.setValue(content); }catch(e){ tab.doc = new CodeMirror.Doc(content, cmMode); }
+  tab.cmMode = cmMode;
+  tab.contentMode = contentMode;
+  tab.spreadsheetData = spreadsheetData || null;
+  
+  if(targetTabId === activeTabId){
+    // Jika tab yang dituju adalah tab yang sedang aktif, update UI langsung
+    currentFile = fileName;
+    currentMode = contentMode;
+    currentSpreadsheetData = spreadsheetData || null;
+    document.getElementById('file').textContent = fileName;
+    editor.setOption('mode', cmMode);
+    const ms = document.getElementById('mode'); if(ms) ms.value = cmMode;
+    if(typeof afterApply === 'function'){ afterApply(); } else { runPreview(); }
+  } else {
+    // Jika tab yang dituju tidak aktif, cukup update UI tabnya saja tanpa mengganggu editor aktif
+    renderTabsUI();
+  }
+  saveToLocal();
+  return true;
+}
+
+// Listener untuk capture dari iframe sandbox (fallback kalau allow-downloads tidak didukung browser lawas)
+window.addEventListener('message', (ev)=>{
+  if(!ev.data || ev.data.type !== 'manako-capture-download') return;
+  try{
+    const {dataURL, filename} = ev.data;
+    const a = document.createElement('a');
+    a.href = dataURL; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(e){} }, 2000);
+  }catch(e){ console.error('Gagal download via postMessage:', e); }
+});
 
 function resetToIframePreview(){
   if(pdfPreview){ pdfPreview.style.display = 'none'; if(pdfPreview.getAttribute('src')) pdfPreview.removeAttribute('src'); }
@@ -303,12 +563,19 @@ function resetToIframePreview(){
 }
 
 function runPreview(){ 
-  if (currentMode === 'compare') return;
+  if(currentMode === 'media') return;
+  if(currentMode === 'pdf'){
+    if(currentPdfUrl){ preview.style.display = 'none'; pdfPreview.style.display = 'flex'; if(pdfPreview.getAttribute('src') !== currentPdfUrl) pdfPreview.src = currentPdfUrl; }
+    return;
+  }
   resetToIframePreview();
   if(currentMode === 'csv' || currentMode === 'xlsx' || currentMode === 'mxl'){
     updateSpreadsheetPreview();
   } else if(currentMode === 'md'){
     renderMarkdownPreview();
+  } else if(currentMode === 'text') {
+    // Preview teks polos (untuk .js, .css, .c, .py dll)
+    preview.srcdoc = `<pre style="background:#1e1e1e;color:#ccc;padding:10px;font-family:monospace;overflow:auto;white-space:pre-wrap;">${editor.getValue().replace(/&/g,'&amp;').replace(/</g,'&lt;')}</pre>`;
   } else {
     preview.srcdoc = editor.getValue(); 
   }
@@ -333,6 +600,193 @@ function renderMarkdownPreview(){
     hr{border:none;border-top:1px solid #333;margin:18px 0;}
   </style></head><body>${html}</body></html>`;
 }
+
+// ===================== PANEL MEDIA (Video/Audio) =====================
+let mediaInfoInstance = null;
+function loadMediaInfoScript(){
+  return new Promise((resolve, reject)=>{
+    if(window.MediaInfo){ resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mediainfo.js@0.3.7/dist/umd/index.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Gagal memuat MediaInfo.js (cek koneksi internet)'));
+    document.head.appendChild(s);
+  });
+}
+
+async function analyzeMediaFile(file){
+  await loadMediaInfoScript();
+  if(!mediaInfoInstance){
+    const factory = (window.MediaInfo && window.MediaInfo.default) ? window.MediaInfo.default : window.MediaInfo;
+    mediaInfoInstance = await new Promise((resolve, reject) => factory({ format: 'text' }, resolve, reject));
+  }
+  const getSize = () => file.size;
+  const readChunk = (chunkSize, offset) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(new Uint8Array(ev.target.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file.slice(offset, offset + chunkSize));
+  });
+  return mediaInfoInstance.analyzeData(getSize, readChunk);
+}
+
+function formatFileSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  const units = ['KB','MB','GB']; let v = bytes;
+  for(const u of units){ v /= 1024; if(v < 1024) return v.toFixed(2) + ' ' + u; }
+  return v.toFixed(2) + ' TB';
+}
+
+function buildMediaInfoText(file, mediaInfoRaw){
+  const header = [
+    '📁 BERKAS',
+    '─────────────────────────────',
+    'Nama File   : ' + file.name,
+    'Ukuran      : ' + formatFileSize(file.size),
+    'Tipe MIME   : ' + (file.type || '(tidak diketahui)'),
+    'Diubah      : ' + (file.lastModified ? new Date(file.lastModified).toLocaleString('id-ID') : '-'),
+    ''
+  ].join('\n');
+  return header + (mediaInfoRaw || '(Detail teknis tidak tersedia)');
+}
+
+function buildMediaPlayerHtml(url, isAudio){
+  const mediaTag = isAudio
+    ? `<audio id="v" controls src="${url}"></audio>`
+    : `<video id="v" controls playsinline src="${url}"></video>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box;}
+    body{margin:0;background:#000;display:flex;flex-direction:column;height:100vh;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;}
+    video{flex:1;width:100%;min-height:0;background:#000;object-fit:contain;}
+    audio{margin:auto;width:88%;}
+    .controls{background:#1e1e1e;padding:8px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;border-top:1px solid #333;flex-shrink:0;}
+    .grp-label{font-size:11px;color:#888;margin-right:2px;}
+    .controls button{background:#333;color:#ddd;border:1px solid #555;border-radius:4px;padding:5px 9px;font-size:12px;cursor:pointer;}
+    .controls button:hover{background:#444;}
+    .controls button.active{background:#007acc;border-color:#007acc;color:#fff;}
+    .rate-label{font-size:11px;color:#888;margin-left:4px;white-space:nowrap;}
+    .cap-group{margin-left:auto;display:flex;gap:5px;}
+    .cap-group button{background:#2d5a2d;border-color:#3d7a3d;}
+    .cap-group button:hover{background:#3d7a3d;}
+    .warn{font-size:10px;color:#e8a33d;width:100%;margin-top:2px;}
+  </style></head><body>
+    ${mediaTag}
+    <div class="controls">
+      <span class="grp-label">⚡ Speed:</span>
+      <button data-r="0.15">0.15x</button><button data-r="0.25">0.25x</button><button data-r="0.5">0.5x</button>
+      <button data-r="1" class="active">1x</button><button data-r="1.25">1.25x</button><button data-r="1.5">1.5x</button>
+      <button data-r="1.75">1.75x</button><button data-r="2">2x</button><button data-r="4">4x</button>
+      <button data-r="16">16x</button><button data-r="32">32x</button>
+      <span class="rate-label" id="rateLabel"></span>
+      ${isAudio ? '' : `<div class="cap-group"><button id="capPng">📸 PNG</button><button id="capJpg">📸 JPG</button></div>`}
+      <div class="warn" id="warnBox"></div>
+    </div>
+  <script>
+    const v = document.getElementById('v');
+    const label = document.getElementById('rateLabel');
+    const warnBox = document.getElementById('warnBox');
+    document.querySelectorAll('[data-r]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const wanted = parseFloat(btn.dataset.r);
+        try{ v.playbackRate = wanted; }catch(e){}
+        document.querySelectorAll('[data-r]').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        requestAnimationFrame(()=>{
+          const actual = v.playbackRate;
+          label.textContent = 'aktual: ' + actual + 'x';
+          warnBox.textContent = (actual !== wanted) ? ('⚠️ Browser membatasi ke ' + actual + 'x (diminta ' + wanted + 'x)') : ((wanted < 0.25 || wanted > 4) ? '⚠️ Di kecepatan ini audio biasanya senyap otomatis (batasan browser, bukan bug).' : '');
+        });
+      };
+    });
+    ${isAudio ? '' : `
+    function capture(type, ext){
+      try{
+        if(!v.videoWidth){ alert('Video belum siap / belum ada frame untuk di-capture.'); return; }
+        const canvas = document.createElement('canvas');
+        canvas.width = v.videoWidth; canvas.height = v.videoHeight;
+        canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+        // Coba direct download (butuh allow-downloads di iframe, sudah ada di 3c), fallback ke postMessage ke parent
+        try{
+          canvas.toBlob(blob=>{
+            if(!blob){ alert('Gagal membuat gambar capture.'); return; }
+            // Jika parent tersedia, kirim via postMessage sebagai dataURL (paling kompatibel lintas browser)
+            try{
+              const dataURL = canvas.toDataURL(type, 0.95);
+              const filename = 'capture_' + Date.now() + '.' + ext;
+              if(window.parent && window.parent !== window){
+                window.parent.postMessage({type:'manako-capture-download', dataURL, filename}, '*');
+              }
+              // Tetap coba direct download juga (untuk browser modern yang support allow-downloads)
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = filename;
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(()=>URL.revokeObjectURL(url), 4000);
+            }catch(inner){
+              // Fallback total ke direct
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'capture_' + Date.now() + '.' + ext;
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(()=>URL.revokeObjectURL(url), 4000);
+            }
+          }, type, 0.95);
+        }catch(e){
+          // Canvas toBlob gagal, pakai toDataURL langsung
+          const dataURL = canvas.toDataURL(type, 0.95);
+          const filename = 'capture_' + Date.now() + '.' + ext;
+          if(window.parent && window.parent !== window){
+            window.parent.postMessage({type:'manako-capture-download', dataURL, filename}, '*');
+          } else {
+            const a = document.createElement('a'); a.href = dataURL; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+          }
+        }
+      }catch(e){ alert('Gagal capture: ' + e.message); }
+    }
+    document.getElementById('capPng').onclick = ()=> capture('image/png','png');
+    document.getElementById('capJpg').onclick = ()=> capture('image/jpeg','jpg');
+    `}
+  <\/script>
+  </body></html>`;
+}
+
+function renderMediaPlayer(file, url){
+  preview.style.display = ''; pdfPreview.style.display = 'none';
+  const isAudio = (file.type && file.type.indexOf('audio') === 0) || /\.(mp3|wav|ogg|oga|m4a|flac|aac|wma)$/i.test(file.name);
+  preview.srcdoc = buildMediaPlayerHtml(url, isAudio);
+}
+
+async function openMediaPreview(file){
+  syncActiveTabFromGlobals(); // Simpan tab asli sebelum ganti ke media
+  exitTransientPreview();
+  if(currentMediaUrl){ URL.revokeObjectURL(currentMediaUrl); currentMediaUrl = null; }
+  currentMediaUrl = URL.createObjectURL(file);
+  currentMode = 'media';
+  currentFile = file.name;
+  document.getElementById('file').textContent = currentFile;
+  mediaInfoDoc = new CodeMirror.Doc('⏳ Menganalisis ' + file.name + ' ...\n\n(File besar butuh waktu lebih lama — dibaca bertahap per-chunk biar gak bikin browser lag.)', 'text/plain');
+  editor.swapDoc(mediaInfoDoc);
+  editor.setOption('mode', 'text/plain');
+  editor.setOption('readOnly', true);
+  document.getElementById('mode').value = 'text/plain';
+  renderTabsUI();
+  renderMediaPlayer(file, currentMediaUrl);
+  try{
+    const infoText = await analyzeMediaFile(file);
+    if(currentMode === 'media' && currentFile === file.name && mediaInfoDoc){ mediaInfoDoc.setValue(buildMediaInfoText(file, infoText)); }
+  }catch(err){
+    if(currentMode === 'media' && currentFile === file.name && mediaInfoDoc){
+      mediaInfoDoc.setValue(buildMediaInfoText(file, null) + '\n\n⚠️ Gagal membaca detail teknis (' + (err && err.message ? err.message : err) + ').\nFile tetap bisa di-preview & di-capture di panel kanan.');
+    }
+  }
+}
+
+document.getElementById('bukaMedia').addEventListener('click', ()=> { mediaInput.click(); toggleSidebar(); });
+mediaInput.addEventListener('change', (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  openMediaPreview(f);
+  mediaInput.value = '';
+});
 
 function updateSpreadsheetPreview(){
   resetToIframePreview();
@@ -384,27 +838,28 @@ function parseCSV(text) {
 
 // ===================== FILE INPUT HANDLER =====================
 document.getElementById('baru').addEventListener('click', ()=>{
-  if(confirm('Buat file baru? Data akan hilang.')){ editor.setValue(''); currentFile = 'untitled.html'; document.getElementById('file').textContent = currentFile; currentMode='html'; currentSpreadsheetData=null; runPreview(); saveToLocal(); } toggleSidebar();
+  openNewTab('untitled.html', '', 'htmlmixed', 'html');
+  runPreview(); saveToLocal();
+  toggleSidebar();
 });
 document.getElementById('buka').addEventListener('click', ()=> { fileInput.click(); toggleSidebar(); });
+document.getElementById('tabAdd').onclick = ()=>{ openNewTab('untitled.html', '', 'htmlmixed', 'html'); runPreview(); saveToLocal(); };
 
 fileInput.addEventListener('change', (e)=>{
   const f = e.target.files[0]; if(!f) return;
   const ext = f.name.split('.').pop().toLowerCase();
+  // Simpan targetTabId SEBELUM async load, ini kunci anti race condition
+  let targetTabId = null;
+  if(ext !== 'pdf'){ targetTabId = openNewTab(f.name, '', 'htmlmixed', 'html'); }
   const reader = new FileReader();
   
+  // ==================== XLSX / XLS ====================
   if (['xlsx','xls'].includes(ext)) {
       reader.onload = function(ev) {
           const data = new Uint8Array(ev.target.result);
           const isZip = data.length > 4 && data[0] === 0x50 && data[1] === 0x4B && data[2] === 0x03 && data[3] === 0x04;
           if (!isZip) {
-              alert('⚠️ File ini sepertinya bukan XLSX valid (mungkin di-rename dari CSV). Coba buka sebagai CSV atau gunakan file XLSX asli.');
               const csvText = new TextDecoder().decode(data);
-              editor.setValue(csvText);
-              currentFile = f.name;
-              document.getElementById('file').textContent = currentFile;
-              editor.setOption('mode', 'text/plain');
-              document.getElementById('mode').value = 'text/plain';
               const rows = parseCSV(csvText);
               let tableHtml = `<div style="padding:10px;background:#1e1e1e;color:#ccc;font-family:sans-serif;"><div style="margin-bottom:10px;color:#aaa;">📊 <b>${f.name}</b> (dideteksi sebagai CSV) · Baris: ${rows.length}</div><div style="max-height:80vh;overflow:auto;border:1px solid #444;"><table border="1" style="border-collapse:collapse;font-size:14px;width:100%;background:#111;">`;
               rows.forEach((row, idx) => {
@@ -416,9 +871,16 @@ fileInput.addEventListener('change', (e)=>{
                   tableHtml += `</tr>`;
               });
               tableHtml += `</table></div></div>`;
-              resetToIframePreview();
-              preview.srcdoc = tableHtml;
-              saveToLocal();
+              // Race-safe: tulis ke tab yang dituju, bukan ke tab aktif yang mungkin sudah pindah
+              const ok = applyLoadedContentToTab(targetTabId, f.name, csvText, 'text/plain', 'csv', { sheets: [{ name: 'Sheet1', data: rows }] }, ()=>{
+                resetToIframePreview();
+                preview.srcdoc = tableHtml;
+              });
+              if(!ok){ // fallback kalau tab sudah tertutup
+                editor.setValue(csvText); currentFile=f.name; document.getElementById('file').textContent=currentFile;
+                editor.setOption('mode','text/plain'); document.getElementById('mode').value='text/plain'; currentMode='csv';
+                resetToIframePreview(); preview.srcdoc = tableHtml; saveToLocal();
+              }
               return;
           }
 
@@ -446,18 +908,13 @@ fileInput.addEventListener('change', (e)=>{
                 });
                 return { name: s.name, data: sheetRows };
               });
-              currentSpreadsheetData = { sheets: allSheets };
               const rows = allSheets[sheetIdx-1]?.data || [];
               const csvText = Papa.unparse(rows);
-              editor.setValue(csvText);
-              currentFile = fileName;
-              document.getElementById('file').textContent = currentFile;
-              editor.setOption('mode', 'text/plain');
-              document.getElementById('mode').value = 'text/plain';
-              currentMode = 'xlsx';
-              updateSpreadsheetPreview();
-              saveToLocal();
+              applyLoadedContentToTab(targetTabId, fileName, csvText, 'text/plain', 'xlsx', { sheets: allSheets }, ()=>{
+                updateSpreadsheetPreview();
+              });
           }
+
           workbook.xlsx.load(data).then(() => { renderSheetToHTML(workbook, 1, f.name); }).catch(err => {
               if (err.message && err.message.toLowerCase().includes('password')) {
                   const pw = prompt('🔒 File ini diproteksi password. Masukkan password:');
@@ -467,52 +924,45 @@ fileInput.addEventListener('change', (e)=>{
                       alert('❌ Password salah atau file rusak: ' + err2.message);
                   });
               } else {
-                  alert('❌ Gagal membaca XLSX: ' + err.message + '\n\nPastikan file ini adalah file XLSX asli (bukan rename dari CSV).');
+                  alert('❌ Gagal membaca XLSX: ' + err.message + ' Pastikan file ini adalah file XLSX asli (bukan rename dari CSV).');
               }
           });
       };
       reader.readAsArrayBuffer(f);
       
+  // ==================== MXL / GTX ====================
   } else if (ext === 'mxl' || ext === 'gtx') {
       reader.onload = ev => {
           try {
               const rawText = ev.target.result;
               const parsed = JSON.parse(rawText);
-              currentSpreadsheetData = parsed;
-              editor.setValue(rawText);
-              currentFile = f.name;
-              document.getElementById('file').textContent = currentFile;
-              editor.setOption('mode', 'text/plain');
-              document.getElementById('mode').value = 'text/plain';
-              currentMode = 'mxl';
-              updateSpreadsheetPreview();
-              saveToLocal();
+              applyLoadedContentToTab(targetTabId, f.name, rawText, 'text/plain', 'mxl', parsed, ()=>{
+                updateSpreadsheetPreview();
+              });
           } catch(e) {
               alert('Gagal membuka MXL (Format JSON tidak valid): ' + e.message);
-              editor.setValue(ev.target.result);
+              applyLoadedContentToTab(targetTabId, f.name, ev.target.result, 'text/plain', 'html', null, null);
           }
       };
       reader.readAsText(f);
 
+  // ==================== CSV ====================
   } else if (ext === 'csv') {
       reader.onload = ev => {
           const csv = ev.target.result;
-          editor.setValue(csv);
-          currentFile = f.name;
-          document.getElementById('file').textContent = currentFile;
-          editor.setOption('mode', 'text/plain');
-          document.getElementById('mode').value = 'text/plain';
-          currentMode = 'csv';
           const rows = parseCSV(csv);
-          currentSpreadsheetData = { sheets: [{ name: 'Sheet1', data: rows }] };
-          updateSpreadsheetPreview();
-          saveToLocal();
+          applyLoadedContentToTab(targetTabId, f.name, csv, 'text/plain', 'csv', { sheets: [{ name: 'Sheet1', data: rows }] }, ()=>{
+            updateSpreadsheetPreview();
+          });
       };
       reader.readAsText(f);
 
+  // ==================== PDF ====================
   } else if (ext === 'pdf') {
       reader.onload = ev => {
           try{
+              syncActiveTabFromGlobals();
+              exitTransientPreview();
               const blob = new Blob([ev.target.result], {type:'application/pdf'});
               if(currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
               currentPdfUrl = URL.createObjectURL(blob);
@@ -522,22 +972,23 @@ fileInput.addEventListener('change', (e)=>{
               currentFile = f.name;
               document.getElementById('file').textContent = currentFile;
               currentMode = 'pdf';
+              renderTabsUI();
           }catch(e){ alert('❌ Gagal membuka PDF: ' + e.message); }
       };
       reader.readAsArrayBuffer(f);
 
   } else {
       reader.onload = ev => {
-          editor.setValue(ev.target.result); currentFile = f.name; document.getElementById('file').textContent = currentFile;
           const map = {html:'htmlmixed', htm:'htmlmixed', js:'javascript', css:'css', py:'python', c:'text/x-csrc', h:'text/x-csrc', md:'markdown', txt:'text/plain'};
-          editor.setOption('mode', map[ext] || 'text/plain'); document.getElementById('mode').value = map[ext] || 'text/plain';
-          currentMode = (ext === 'md') ? 'md' : 'html';
-          runPreview(); saveToLocal();
+          const cmMode = map[ext] || 'text/plain';
+          const contentMode = (ext === 'md') ? 'md' : (ext === 'html' || ext === 'htm' ? 'html' : 'text');
+          applyLoadedContentToTab(targetTabId, f.name, ev.target.result, cmMode, contentMode, null, null);
       };
       reader.readAsText(f);
   }
   e.target.value = '';
 });
+
 
 document.getElementById('simpan').addEventListener('click', ()=>{
   toggleSidebar(); const nama = prompt('Simpan sebagai:', currentFile); if(!nama) return;
@@ -591,10 +1042,7 @@ document.getElementById('convertMXL').addEventListener('click', function() {
 });
 
 // ===================== MENU LAINNYA =====================
-document.getElementById('run').onclick = () => { 
-  if (currentMode === 'compare') currentMode = 'html';
-  runPreview(); toggleSidebar(); 
-};
+document.getElementById('run').onclick = () => { runPreview(); toggleSidebar(); };
 document.getElementById('format').onclick = ()=>{
   const mode = editor.getOption('mode'); let out = editor.getValue();
   try{
@@ -619,7 +1067,9 @@ document.getElementById('b64d').onclick = ()=>{
 };
 document.getElementById('mode').onchange = e=> {
   editor.setOption('mode', e.target.value);
-  if(e.target.value === 'markdown'){ currentMode = 'md'; } else if(currentMode === 'md' || currentMode === 'compare'){ currentMode = 'html'; }
+  if(e.target.value === 'markdown'){ currentMode = 'md'; } 
+  else if(currentMode === 'md'){ currentMode = 'html'; }
+  else { currentMode = 'text'; }
   runPreview();
 };
 document.getElementById('tema').onclick = ()=>{
@@ -636,16 +1086,9 @@ document.getElementById('themeSelect').onchange = e=>{
   document.getElementById('tema').textContent = dark ? '🌙 Toggle Tema (Dark/Light)' : '☀️ Toggle Tema (Dark/Light)';
   saveToLocal();
 };
+let t; editor.on('change', ()=>{ clearTimeout(t); t=setTimeout(runPreview, 800); });
 
-let t; 
-editor.on('change', ()=>{ 
-  clearTimeout(t); 
-  t=setTimeout(() => {
-    if (currentMode !== 'compare') runPreview(); 
-  }, 800); 
-});
-
-// ===================== SNIPPETS =====================
+// ===================== SNIPPETS / TEMPLATE CEPAT =====================
 const SNIPPETS = {
   html5:   '<!DOCTYPE html>\n<html lang="id">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>Judul Halaman</title>\n</head>\n<body>\n\n</body>\n</html>',
   htmldiv: '<div class="">\n\n</div>',
@@ -675,127 +1118,24 @@ function compressHTML() {
     editor.setValue(code); runPreview(); alert("HTML berhasil di-compress!"); toggleSidebar();
 }
 
-// ===================== EXPORT / PRINT (FIX FINAL - PDF TIDAK KOSONG) =====================
+// ===================== EXPORT / PRINT =====================
 function exportFile(format) {
-    toggleSidebar();
-
-    // Cek apakah library berhasil dimuat
-    const libraryGagal = (typeof html2pdf === 'undefined' || typeof html2canvas === 'undefined');
-
-    // --- FALLBACK TANPA LIBRARY ---
-    if (libraryGagal) {
-        if (format === 'jpg' || format === 'png') {
-            alert('❌ Library html2canvas tidak termuat. Export JPG/PNG tidak bisa. Gunakan PDF, atau jalankan lewat Live Server.');
-            return;
-        }
-
-        // Fallback ke print browser
-        const editorContent = editor.getValue();
-        if (!editorContent.trim()) {
-            alert('❌ Editor kosong.');
-            return;
-        }
-        const htmlPrint = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-            body { font-family: monospace; padding: 20px; background: #fff; color: #000; white-space: pre-wrap; max-width: 800px; margin: auto; }
-        </style></head><body>${editorContent.replace(/</g,'&lt;')}</body></html>`;
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-        if (!printWindow) {
-            alert('⚠️ Popup diblokir. Izinkan popup di browser.');
-            return;
-        }
-        printWindow.document.write(htmlPrint);
-        printWindow.document.close();
-        printWindow.onload = () => { printWindow.print(); };
-        return;
+    const previewFrame = document.getElementById('preview');
+    const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    const targetElement = previewDoc.body;
+    if (!targetElement || targetElement.innerHTML.trim() === "") { alert("Preview kosong"); return; } toggleSidebar();
+    if (format === 'pdf') {
+        html2pdf().set({ margin:0.5, filename:'manako-export.pdf', image:{ type:'jpeg', quality:0.98 }, html2canvas:{ scale:2, useCORS:true }, jsPDF:{ unit:'in', format:'letter', orientation:'portrait' } }).from(targetElement).save();
+    } else if (format === 'jpg' || format === 'png') {
+        html2canvas(targetElement, { scale:2, useCORS:true }).then(canvas => {
+            const link = document.createElement('a'); link.download = `manako-export.${format}`; link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`); link.click();
+        });
     }
-
-    // --- KODE EKSPOR NORMAL (library sudah termuat) ---
-    let contentHtml = '';
-    let isPreviewEmpty = true;
-
-    if (currentMode !== 'compare' && currentMode !== 'pdf') {
-        const previewFrame = document.getElementById('preview');
-        const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-        const body = previewDoc.body;
-        if (body && body.innerHTML.trim() !== '') {
-            contentHtml = body.innerHTML;
-            isPreviewEmpty = false;
-        }
-    }
-
-    if (isPreviewEmpty) {
-        const editorContent = editor.getValue();
-        if (!editorContent.trim()) {
-            alert('❌ Preview dan Editor kosong.');
-            return;
-        }
-        contentHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-            body { font-family: monospace; padding: 20px; background: #fff; color: #000; white-space: pre-wrap; }
-        </style></head><body>${editorContent.replace(/</g,'&lt;')}</body></html>`;
-    }
-
-    const container = document.createElement('div');
-    container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:800px;background:#fff;color:#000;';
-    container.innerHTML = contentHtml;
-    document.body.appendChild(container);
-
-    // Tunggu render 500ms
-    setTimeout(() => {
-        try {
-            if (format === 'jpg' || format === 'png') {
-                html2canvas(container, { scale: 2, useCORS: true, logging: false })
-                    .then(canvas => {
-                        const link = document.createElement('a');
-                        link.download = `manako-export.${format}`;
-                        link.href = canvas.toDataURL(`image/${format === 'jpg' ? 'jpeg' : 'png'}`);
-                        link.click();
-                        document.body.removeChild(container);
-                    })
-                    .catch(err => {
-                        document.body.removeChild(container);
-                        alert('❌ Gagal export gambar: ' + err.message);
-                    });
-            } 
-            // === BAGIAN INI YANG MEMPERBAIKI PDF KOSONG ===
-            else if (format === 'pdf') {
-                html2canvas(container, { scale: 2, useCORS: true, logging: false })
-                    .then(canvas => {
-                        // Ubah canvas jadi gambar JPEG
-                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                        
-                        // Ambil library jsPDF yang sudah ter-load
-                        const { jsPDF } = window.jspdf;
-                        const pdf = new jsPDF('p', 'mm', 'a4'); // A4 portrait
-                        
-                        // Hitung rasio agar gambar pas di halaman PDF
-                        const imgProps = pdf.getImageProperties(imgData);
-                        const pdfWidth = pdf.internal.pageSize.getWidth();
-                        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                        
-                        // Masukkan gambar ke halaman PDF
-                        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                        
-                        // Download PDF
-                        pdf.save('manako-export.pdf');
-                        
-                        document.body.removeChild(container);
-                    })
-                    .catch(err => {
-                        document.body.removeChild(container);
-                        console.error('Export PDF error:', err);
-                        alert('❌ Gagal export PDF: ' + err.message);
-                    });
-            }
-        } catch (err) {
-            document.body.removeChild(container);
-            alert('❌ Error tak terduga: ' + err.message);
-        }
-    }, 500);
 }
 document.getElementById('exportMd').onclick = function() { if (!editor.getValue().trim()) return; const nama = currentFile.replace(/\.[^/.]+$/, '') + '.md'; const blob = new Blob([editor.getValue()], {type:'text/markdown;charset=utf-8'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = nama; a.click(); toggleSidebar(); };
 function exportPreviewToMD() { const html = (preview.contentDocument || preview.contentWindow.document).body.innerHTML; if (!html.trim()) return alert('Preview kosong.'); const markdown = new TurndownService().turndown(html); const blob = new Blob([markdown], {type:'text/markdown'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'preview-export.md'; a.click(); }
 
-// ===================== SAVE AS =====================
+// ===================== SAVE AS (CSV, XLSX, XLSX-PW, MXL) =====================
 function saveAsCSV() {
     const content = editor.getValue(); if (!content.trim()) { alert('Editor kosong.'); return; }
     const nama = prompt('Nama file CSV:', currentFile.replace(/\.[^/.]+$/, '') + '.csv'); if (!nama) return;
@@ -832,6 +1172,10 @@ async function deriveKey(password, salt){
   return crypto.subtle.deriveKey({name:'PBKDF2', salt: salt, iterations: 100000, hash:'SHA-256'}, keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
 }
 async function encryptGTX(jsonText, password){
+  if(!window.isSecureContext || !window.crypto || !window.crypto.subtle){
+    alert('⚠️ Lingkungan tidak aman (file://), enkripsi AES-GCM tidak didukung. Data akan disimpan tanpa password.');
+    return 'MANAKO1_PLAIN:' + btoa(String.fromCharCode(...new TextEncoder().encode(jsonText)));
+  }
   const enc = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -842,6 +1186,11 @@ async function encryptGTX(jsonText, password){
   return 'MANAKO1:' + btoa(String.fromCharCode(...combined));
 }
 async function decryptGTX(b64data, password){
+  if(b64data.startsWith('MANAKO1_PLAIN:')){
+    const raw = atob(b64data.replace('MANAKO1_PLAIN:',''));
+    const bytes = Uint8Array.from(raw, c=>c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
   try{
     const raw = atob(b64data.replace('MANAKO1:',''));
     const bytes = Uint8Array.from(raw, c=>c.charCodeAt(0));
@@ -887,21 +1236,31 @@ function saveAsMXL() {
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = nama; a.click(); toggleSidebar();
 }
 
-// ===================== CLOSE ALL =====================
+// ===================== CLOSE ALL & CLEAR MEMORY =====================
 document.getElementById('closeAll').addEventListener('click', function() {
     toggleSidebar();
     if(confirm('🧹 Tutup semua file & bersihkan memori?')) {
-        editor.setValue(''); currentFile = 'untitled.html'; document.getElementById('file').textContent = currentFile;
-        document.getElementById('pos').textContent = 'Ln 1, Col 1'; resetToIframePreview(); preview.srcdoc = ''; fileInput.value = '';
-        if(currentPdfUrl){ URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
+        exitTransientPreview(); // Bersihkan PDF/Media
+        tabs = []; tabCounter = 0;
+        currentFile = 'untitled.html'; currentMode = 'html'; currentSpreadsheetData = null;
+        document.getElementById('file').textContent = currentFile;
+        document.getElementById('pos').textContent = 'Ln 1, Col 1'; resetToIframePreview(); preview.srcdoc = ''; 
         editor.setOption('mode', 'htmlmixed'); document.getElementById('mode').value = 'htmlmixed';
-        currentSpreadsheetData = null; currentMode='html';
+        
+        const firstId = 'tab_' + (++tabCounter);
+        const doc = new CodeMirror.Doc('', 'htmlmixed');
+        tabs.push({ id: firstId, name: currentFile, doc: doc, cmMode: 'htmlmixed', contentMode: 'html', spreadsheetData: null, scrollInfo: null });
+        activeTabId = firstId;
+        editor.swapDoc(doc);
+        
         document.querySelectorAll('a[href^="blob:"]').forEach(el => { URL.revokeObjectURL(el.href); el.removeAttribute('href'); });
-        saveToLocal(); alert('✅ Memori dibersihkan! Browser kembali ringan.');
+        renderTabsUI();
+        saveToLocal(); 
+        alert('✅ Memori dibersihkan! Browser kembali ringan.');
     }
 });
 
-// ===================== SHORTCUT =====================
+// ===================== SHORTCUT KEYBOARD =====================
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'h') { e.preventDefault(); editor.execCommand('replace'); }
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); editor.execCommand('find'); }
@@ -925,6 +1284,7 @@ document.getElementById('convertPwdXlsx').onclick = async () => {
         const data = ev.target.result;
         const wb = new ExcelJS.Workbook();
         await wb.xlsx.load(data, {password: excelPw});
+        
         const allSheets = wb.worksheets.map(s => {
           const rows = [];
           s.eachRow({includeEmpty:true}, row => {
@@ -945,6 +1305,7 @@ document.getElementById('convertPwdXlsx').onclick = async () => {
           });
           return {name:s.name, data:rows};
         });
+        
         currentSpreadsheetData = {sheets: allSheets};
         const firstRows = allSheets[0]?.data || [];
         editor.setValue(Papa.unparse(firstRows));
@@ -952,8 +1313,10 @@ document.getElementById('convertPwdXlsx').onclick = async () => {
         document.getElementById('file').textContent = currentFile;
         currentMode = 'xlsx';
         updateSpreadsheetPreview();
+        
         const manakoPw = prompt('Buat password Manako untuk file GTX (ini yang dipakai adik lo nanti):');
         if(manakoPw===null){ alert('Dibatalkan'); return; }
+        
         const jsonString = JSON.stringify(currentSpreadsheetData, null, 2);
         let blob;
         if(manakoPw){
@@ -962,10 +1325,12 @@ document.getElementById('convertPwdXlsx').onclick = async () => {
         } else {
           blob = new Blob([jsonString], {type:'application/json'});
         }
+        
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = currentFile; a.click();
         URL.revokeObjectURL(url);
+        
         alert('✅ Selesai! File '+currentFile+' sudah tersimpan.\n\nSekarang buka file GTX ini di Manako — tidak akan hang lagi, karena pakai password Manako (bukan Excel).');
         preview.srcdoc = '';
       }catch(err){
@@ -979,116 +1344,123 @@ document.getElementById('convertPwdXlsx').onclick = async () => {
   input.click();
 };
 
-// ===================== COMPARE FILE – FIXED =====================
-document.getElementById('compareFiles').onclick = async function() {
-    toggleSidebar();
 
-    if (typeof Diff === 'undefined' || typeof Diff.diffLines === 'undefined') {
-        alert('❌ Pustaka jsdiff tidak dimuat. Periksa koneksi internet atau muat ulang halaman.');
-        return;
-    }
+document.getElementById('compareFiles').onclick = async () => {
+  toggleSidebar();
+  const pickFiles = () => new Promise(res => {
+    const i = document.createElement('input'); i.type='file'; i.multiple = true; i.accept='.txt,.csv,.md,.html,.js,.json,.mxl,.gtx,.htm,.py,.c,.css';
+    i.onchange = async e => {
+      const files = Array.from(e.target.files).slice(0,2);
+      if(files.length < 2) return res(null);
+      const reads = files.map(f => new Promise(r => { const fr = new FileReader(); fr.onload = ev => r({name:f.name, text:ev.target.result}); fr.readAsText(f); }));
+      const [f1,f2] = await Promise.all(reads);
+      res([f1,f2]);
+    };
+    i.click();
+  });
+  alert('Pilih 2 FILE sekaligus (Ctrl+klik): FILE 1 = versi lama (kiri), FILE 2 = versi baru (kanan)');
+  const files = await pickFiles(); if(!files) return;
+  const [f1,f2] = files;
 
-    const pickTwoFiles = () => new Promise((resolve) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = '.txt,.csv,.md,.html,.js,.json,.mxl,.gtx,.htm,.py,.c,.css,.xml,.ini,.log,.sh,.bat,.ps1,.java,.rb,.php,.ts,.tsx,.jsx,.vue,.svelte';
-        input.onchange = (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length < 2) {
-                alert('❌ Anda harus memilih 2 file (tekan Ctrl saat klik).');
-                resolve(null);
-                return;
-            }
-            const selected = files.slice(0, 2);
-            const reads = selected.map((f) => new Promise((res) => {
-                const fr = new FileReader();
-                fr.onload = (ev) => res({ name: f.name, text: ev.target.result });
-                fr.onerror = () => res({ name: f.name, text: '' });
-                fr.readAsText(f, 'UTF-8');
-            }));
-            Promise.all(reads).then(resolve);
-        };
-        input.click();
+  // PERBAIKAN: batasi ukuran file agar browser tidak hang
+  if (f1.text.length > 300000 || f2.text.length > 300000) {
+     alert('⚠️ File terlalu besar (>300.000 karakter) untuk ditampilkan side-by-side. Batasi file Anda.');
+     return;
+  }
+
+  resetToIframePreview();
+
+  const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lineDiff = Diff.diffLines(f1.text, f2.text);
+
+  let linesAdded = 0, linesRemoved = 0;
+  lineDiff.forEach(part => {
+    const n = part.value.split('\n').filter((l,idx,arr)=> !(idx===arr.length-1 && l==='')).length;
+    if(part.added) linesAdded += n;
+    else if(part.removed) linesRemoved += n;
+  });
+
+  const combinedSize = f1.text.length + f2.text.length;
+  let charsAdded = 0, charsRemoved = 0;
+  if(combinedSize <= 300000){
+    Diff.diffChars(f1.text, f2.text).forEach(part => {
+      if(part.added) charsAdded += part.value.length;
+      else if(part.removed) charsRemoved += part.value.length;
     });
+  } else {
+    lineDiff.forEach(part => {
+      if(part.added) charsAdded += part.value.length;
+      else if(part.removed) charsRemoved += part.value.length;
+    });
+  }
 
-    alert('📌 Pilih 2 FILE sekaligus (Ctrl+klik):\nFILE 1 = versi lama (kiri/Editor)\nFILE 2 = versi baru (kanan/Preview)');
-    const files = await pickTwoFiles();
-    if (!files) return;
-    const [f1, f2] = files;
+  const size1 = new Blob([f1.text]).size;
+  const size2 = new Blob([f2.text]).size;
+  const sizeDiff = size2 - size1;
+  const fmtSize = b => b < 1024 ? b + ' B' : (b/1024).toFixed(2) + ' KB';
+  const sizeDiffStr = (sizeDiff >= 0 ? '+' : '') + fmtSize(sizeDiff);
 
-    clearTimeout(t);
-    currentMode = 'compare';
-    resetToIframePreview();
-
-    editor.setValue(f1.text);
-    const ext1 = f1.name.split('.').pop().toLowerCase();
-    const map = { html: 'htmlmixed', htm: 'htmlmixed', js: 'javascript', css: 'css', py: 'python', c: 'text/x-csrc', h: 'text/x-csrc', md: 'markdown', txt: 'text/plain', json: 'javascript', xml: 'htmlmixed', php: 'php', rb: 'ruby', java: 'text/x-java' };
-    editor.setOption('mode', map[ext1] || 'text/plain');
-
-    const ext2 = f2.name.split('.').pop().toLowerCase();
-    const mode2 = map[ext2] || 'text/plain';
-    const themeName = editor.getOption('theme');
-    const container = document.createElement('div');
-    try {
-        CodeMirror.runMode(f2.text, mode2, container);
-    } catch (err) {
-        container.textContent = f2.text;
+  const rows = [];
+  const linesOf = part => { const l = part.value.split('\n'); if(l.length && l[l.length-1] === '') l.pop(); return l; };
+  let i = 0;
+  while(i < lineDiff.length){
+    const part = lineDiff[i];
+    if(!part.added && !part.removed){
+      linesOf(part).forEach(line => rows.push({type:'same', left:line, right:line}));
+      i++;
+    } else if(part.removed && lineDiff[i+1] && lineDiff[i+1].added){
+      const rem = linesOf(part), add = linesOf(lineDiff[i+1]);
+      const max = Math.max(rem.length, add.length);
+      for(let k=0;k<max;k++){ rows.push({ type:'mod', left: k<rem.length?rem[k]:null, right: k<add.length?add[k]:null }); }
+      i += 2;
+    } else if(part.removed){
+      linesOf(part).forEach(line => rows.push({type:'removed', left:line, right:null}));
+      i++;
+    } else {
+      linesOf(part).forEach(line => rows.push({type:'added', left:null, right:line}));
+      i++;
     }
-    const themeCss = document.querySelector(`link[href*="${themeName}.min.css"]`)?.outerHTML || '';
-    const isLight = document.body.classList.contains('light');
-    const previewHtml = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  body { margin: 0; padding: 0; background: ${isLight ? '#fff' : '#1e1e1e'}; font-family: 'Cascadia Code', Consolas, monospace; font-size: 13px; line-height: 1.6; }
-  pre { margin: 0; padding: 12px; overflow: auto; height: 100vh; box-sizing: border-box; }
-  .cm-s-${themeName} { background: transparent !important; }
-</style>
-${themeCss}
-</head><body><pre class="cm-s-${themeName}">${container.innerHTML}</pre></body></html>`;
-    preview.srcdoc = previewHtml;
+  }
 
-    let linesAdded = 0, linesRemoved = 0;
-    let charsAdded = 0, charsRemoved = 0;
-    try {
-        const lineDiff = Diff.diffLines(f1.text, f2.text);
-        lineDiff.forEach(part => {
-            const lines = part.value.split('\n').filter((l, idx, arr) => !(idx === arr.length - 1 && l === ''));
-            if (part.added) linesAdded += lines.length;
-            else if (part.removed) linesRemoved += lines.length;
-        });
-        const combinedSize = f1.text.length + f2.text.length;
-        if (combinedSize <= 300000) {
-            Diff.diffChars(f1.text, f2.text).forEach(part => {
-                if (part.added) charsAdded += part.value.length;
-                else if (part.removed) charsRemoved += part.value.length;
-            });
-        } else {
-            lineDiff.forEach(part => {
-                if (part.added) charsAdded += part.value.length;
-                else if (part.removed) charsRemoved += part.value.length;
-            });
-        }
-    } catch (err) {
-        console.warn('Diff error:', err);
-    }
+  let leftNum = 1, rightNum = 1;
+  let rowsHtml = '';
+  rows.forEach(r => {
+    const leftBg = (r.type==='removed'||r.type==='mod') ? 'rgba(248,81,73,0.18)' : (r.type==='added' ? '#0d1117' : 'transparent');
+    const rightBg = (r.type==='added'||r.type==='mod') ? 'rgba(46,160,67,0.18)' : (r.type==='removed' ? '#0d1117' : 'transparent');
+    const leftContent = r.left !== null ? escHtml(r.left) : '';
+    const rightContent = r.right !== null ? escHtml(r.right) : '';
+    const leftLn = r.left !== null ? leftNum++ : '';
+    const rightLn = r.right !== null ? rightNum++ : '';
+    rowsHtml += `<div style="display:flex;border-bottom:1px solid #161b22;min-height:20px;">` +
+      `<div style="width:50%;display:flex;background:${leftBg};">` +
+        `<span style="width:42px;text-align:right;padding:0 8px;color:#484f58;user-select:none;flex-shrink:0;">${leftLn}</span>` +
+        `<span style="flex:1;white-space:pre;padding-left:6px;overflow-wrap:anywhere;">${leftContent}</span>` +
+      `</div>` +
+      `<div style="width:50%;display:flex;background:${rightBg};border-left:1px solid #21262d;">` +
+        `<span style="width:42px;text-align:right;padding:0 8px;color:#484f58;user-select:none;flex-shrink:0;">${rightLn}</span>` +
+        `<span style="flex:1;white-space:pre;padding-left:6px;overflow-wrap:anywhere;">${rightContent}</span>` +
+      `</div>` +
+    `</div>`;
+  });
 
-    const size1 = new Blob([f1.text]).size;
-    const size2 = new Blob([f2.text]).size;
-    const sizeDiff = size2 - size1;
-    const fmtSize = b => b < 1024 ? b + ' B' : (b / 1024).toFixed(2) + ' KB';
-    const sizeDiffStr = (sizeDiff >= 0 ? '+' : '') + fmtSize(sizeDiff);
-
-    const statsHtml = `
-        <span style="color:#3fb950;">+${linesAdded} baris</span>
-        <span style="color:#f85149;">-${linesRemoved} baris</span> |
-        <span style="color:#3fb950;">+${charsAdded} karakter</span>
-        <span style="color:#f85149;">-${charsRemoved} karakter</span> |
-        Asli: ${fmtSize(size1)} → Baru: ${fmtSize(size2)} (${sizeDiffStr})
-    `;
-    document.getElementById('diff-stats').innerHTML = statsHtml;
-    currentFile = `COMPARE: ${f1.name} vs ${f2.name}`;
-    document.getElementById('file').textContent = currentFile;
+  const html = `<div style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px;background:#0d1117;color:#c9d1d9;height:100%;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;display:flex;">
+      <div style="width:50%;"><b>🔍 ${escHtml(f1.name)}</b> <span style="color:#8b949e;">(lama)</span></div>
+      <div style="width:50%;border-left:1px solid #30363d;padding-left:8px;"><b>${escHtml(f2.name)}</b> <span style="color:#8b949e;">(baru)</span></div>
+    </div>
+    <div id="cmpScroll" style="flex:1;overflow:auto;">${rowsHtml}</div>
+    <div style="max-height:150px;overflow:auto;background:#161b22;border-top:1px solid #30363d;padding:10px 14px;font-size:12.5px;line-height:1.7;">
+      <b style="color:#e6edf3;">📊 Ringkasan Perubahan</b><br>
+      <span style="color:#3fb950;">+ Baris ditambah: ${linesAdded}</span> &nbsp;|&nbsp;
+      <span style="color:#f85149;">− Baris dihapus: ${linesRemoved}</span><br>
+      <span style="color:#3fb950;">+ Karakter ditambah: ${charsAdded}</span> &nbsp;|&nbsp;
+      <span style="color:#f85149;">− Karakter dihapus: ${charsRemoved}</span><br>
+      Ukuran file lama: ${fmtSize(size1)} · Ukuran file baru: ${fmtSize(size2)} · Selisih: <b style="color:${sizeDiff>0?'#f85149':(sizeDiff<0?'#3fb950':'#8b949e')};">${sizeDiffStr}</b>
+      ${combinedSize > 300000 ? '<br><span style="color:#8b949e;">(File besar — jumlah karakter didekati dari baris, bukan diff karakter penuh, biar tidak berat)</span>' : ''}
+    </div>
+  </div>`;
+  preview.srcdoc = html;
+  document.getElementById('file').textContent = `COMPARE: ${f1.name} vs ${f2.name}`;
 };
 
 // ===================== SUPER EXTREME COMPRESS =====================
@@ -1096,8 +1468,9 @@ function minifyJSSafe(src) {
   let out = '';
   let i = 0;
   const n = src.length;
-  let lastSig = '';
-  let lastWord = '';
+  let lastSig = '';      
+  let lastWord = '';     
+
   const isWordChar = ch => /[A-Za-z0-9_$]/.test(ch);
   const regexKeywords = new Set(['return','typeof','instanceof','in','of','new','delete','void','throw','do','else','yield','case','extends','default','await']);
   const asiRestrictedKeywords = new Set(['return', 'break', 'continue', 'yield']);
@@ -1123,7 +1496,7 @@ function minifyJSSafe(src) {
         s += src[j];
         if (src[j] === '\\') { j++; if (j < n) { s += src[j]; j++; } continue; }
         if (src[j] === quote) { j++; break; }
-        if (src[j] === '\n') { break; }
+        if (src[j] === '\n') { break; } 
         j++;
       }
       out += s; lastSig = quote; lastWord = ''; i = j; continue;
@@ -1142,13 +1515,16 @@ function minifyJSSafe(src) {
       out += s; lastSig = '`'; lastWord = ''; i = j; continue;
     }
     if (c === '/') {
-      const regexContext = lastSig === '' || '(,=:[!&|?{};+-*%^~<>\n'.includes(lastSig) || regexKeywords.has(lastWord);
+      const regexContext =
+        lastSig === '' ||
+        '(,=:[!&|?{};+-*%^~<>\n'.includes(lastSig) ||
+        regexKeywords.has(lastWord);
       if (regexContext) {
         let j = i + 1; let s = c; let inClass = false; let ok = true;
         while (j < n) {
           s += src[j];
           if (src[j] === '\\') { j++; if (j < n) { s += src[j]; j++; } continue; }
-          if (src[j] === '\n') { ok = false; break; }
+          if (src[j] === '\n') { ok = false; break; } 
           if (src[j] === '[') inClass = true;
           else if (src[j] === ']') inClass = false;
           else if (src[j] === '/' && !inClass) { j++; break; }
@@ -1230,6 +1606,7 @@ function compressHTMLExtreme() {
   try {
     const placeholders = [];
     const stash = (content) => { const idx = placeholders.length; placeholders.push(content); return '\u0001PH' + idx + '\u0001'; };
+
     let code = original;
     code = code.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, (m) => {
       const openTag = m.match(/^<script\b[^>]*>/i)[0];
@@ -1248,16 +1625,20 @@ function compressHTMLExtreme() {
     });
     code = code.replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/gi, (m) => stash(m));
     code = code.replace(/<textarea\b[^>]*>[\s\S]*?<\/textarea>/gi, (m) => stash(m));
+
     code = code.replace(/<!--[\s\S]*?-->/g, '');
     code = code.replace(/>\s+</g, '><');
     code = code.replace(/[\r\n\t]+/g, ' ');
     code = code.replace(/\s{2,}/g, ' ');
     code = code.trim();
+
     code = code.replace(/\u0001PH(\d+)\u0001/g, (_, idx) => placeholders[Number(idx)]);
+
     const beforeSize = new Blob([original]).size;
     const afterSize = new Blob([code]).size;
     const saved = beforeSize - afterSize;
     const pct = beforeSize > 0 ? ((saved / beforeSize) * 100).toFixed(1) : '0';
+
     editor.setValue(code);
     runPreview();
     alert(`🚀 Super Extreme Compress selesai!\n\nUkuran awal: ${beforeSize} bytes\nUkuran akhir: ${afterSize} bytes\nHemat: ${saved} bytes (${pct}%)\n\nJS & CSS inline ikut diminify (komentar & spasi dibuang dengan aman; isi string/regex/template literal, serta <pre>/<textarea>, tidak disentuh).`);
@@ -1283,6 +1664,7 @@ function tableHtmlToJSON(){
     if(!table){ alert('❌ Tidak ditemukan tag <table> di dalam Editor.'); return; }
     const allRows = Array.from(table.rows).map(tr => Array.from(tr.cells).map(td => td.textContent.trim()));
     if(!allRows.length){ alert('❌ Tabel ditemukan tapi tidak ada baris di dalamnya.'); return; }
+
     let headers = allRows[0];
     const dataRows = allRows.slice(1);
     const seen = {};
@@ -1291,11 +1673,13 @@ function tableHtmlToJSON(){
       if(seen[name]){ seen[name]++; name = name + '_' + seen[name]; } else { seen[name] = 1; }
       return name;
     });
+
     const result = dataRows.map(row => {
       const obj = {};
       headers.forEach((h, idx) => { obj[h] = row[idx] !== undefined ? row[idx] : ''; });
       return obj;
     });
+
     const jsonText = JSON.stringify(result, null, 2);
     editor.setValue(jsonText);
     editor.setOption('mode', 'javascript'); document.getElementById('mode').value = 'javascript';
